@@ -31,6 +31,10 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'rest_framework',
+    'rest_framework_social_oauth2',
+    'oauth2_provider',
+    'file_storage.apps.FileStorageConfig',
     'polls.apps.PollsConfig',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -38,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'social_django',
     'notebook',
 ]
 
@@ -50,6 +55,29 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+
+#LOGIN_URL = '/login/'
+#LOGIN_REDIRECT_URL = '/members/'
+#LOGIN_ERROR_URL = '/login-error/'
+
+
+#TEMPLATE_CONTEXT_PROCESSORS = (
+#  "social_auth.context_processors.social_auth_by_type_backends"
+#)
+
+
+#SOCIAL_AUTH_DEFAULT_USERNAME = 'new_social_auth_user'
+#SOCIAL_AUTH_UID_LENGTH = 16
+#SOCIAL_AUTH_ASSOCIATION_HANDLE_LENGTH = 16
+#SOCIAL_AUTH_NONCE_SERVER_URL_LENGTH = 16
+#SOCIAL_AUTH_ASSOCIATION_SERVER_URL_LENGTH = 16
+#SOCIAL_AUTH_ASSOCIATION_HANDLE_LENGTH = 16
+
+#SOCIAL_AUTH_ENABLED_BACKENDS = ('google')
+
+#GOOGLE_OAUTH2_CLIENT_ID = 'fdghdfghdfhgdfgh'
+#GOOGLE_OAUTH2_CLIENT_SECRET = 'dfghdfghdfghfdghfdgh'
 
 ROOT_URLCONF = 'notebook_server.urls'
 
@@ -83,9 +111,39 @@ DATABASES = {
     }
 }
 
+AUTHENTICATION_BACKENDS = (
+    'social_core.backends.open_id.OpenIdAuth',
+    'social_core.backends.google.GoogleOpenId',
+    'social_core.backends.google.GoogleOAuth2',
+    'django.contrib.auth.backends.ModelBackend',
+    'rest_framework_social_oauth2.backends.DjangoOAuth2'
+)
+
+#REST_FRAMEWORK = {
+#    'DEFAULT_AUTHENTICATION_CLASSES': (
+#        'oauth2_provider.ext.rest_framework.OAuth2Authentication',
+#    ),
+#}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+     #   'oauth2_provider.ext.rest_framework.OAuth2Authentication',
+        'rest_framework_social_oauth2.authentication.SocialAuthentication',
+    ),
+}
+
+#SOCIAL_AUTH_STORAGE = 'social_django_mongoengine.models.DjangoStorage'
+#SOCIAL_AUTH_STORAGE = 'django.db.backends.sqlite3'
+
 
 # Password validation
 # https://docs.djangoproject.com/en/1.10/ref/settings/#auth-password-validators
+
+#SOCIAL_AUTH_USER_MODEL = 'django.contrib.auth.models.User'
+#SOCIAL_AUTH_SECRET_KEY = 'sdfsfsf'
+
+#CSRF_COOKIE_SECURE = False
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
