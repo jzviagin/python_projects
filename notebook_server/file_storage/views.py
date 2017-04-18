@@ -27,6 +27,13 @@ from social.apps.django_app.utils import load_backend
 from social.backends.oauth import BaseOAuth1, BaseOAuth2
 from social.exceptions import AuthAlreadyAssociated
 from django.contrib.auth import login
+from rest_framework.parsers import FileUploadParser
+from file_storage.models import Picture
+from django.core.files.storage import default_storage
+from django.conf import settings
+from django.core.files import File
+import os
+from django.core.files.base import ContentFile
 
 from social.apps.django_app.utils import psa
 
@@ -187,6 +194,7 @@ class PictureList(generics.ListAPIView):
 
 
     def get_queryset(self):
+        #renderer_classes = (JSONRenderer,)
         """
         Filter objects so a user only sees his own stuff.
         If user is admin, let him see all.
@@ -254,6 +262,7 @@ class PictureList(generics.ListAPIView):
         if self.request.user.is_staff:
             return Picture.objects.all()
         else:
+           # return Picture.objects.all()
             return Picture.objects.filter(owner=self.request.user)
     serializer_class = PictureSerializer
 
@@ -354,3 +363,48 @@ def register_by_access_token(request):
         return 'OK'
     else:
         return 'ERROR'
+
+
+class FileUploadView(APIView):
+    parser_classes = (FileUploadParser,)
+
+    def put(self, request, filename, format=None):
+        file_obj = request.FILES['file']
+        picture = Picture.objects.create()
+        picture.file_name = file_obj
+        #picture.owner = request.
+        # do some stuff with uploaded file
+        return Response(status=204)
+
+@api_view(['PUT'])
+def upload_picture(request):
+    if request.method == 'PUT':
+        user = request.user
+        username = user.username
+        file_obj = request.FILES['file']
+        picture = Picture()
+        picture.owner = user
+        picture.file_name = file_obj.name
+        picture.save()
+        default_storage.save(os.path.join( username + '/' , picture.file_name), ContentFile(file_obj.read()))
+        serializer = PictureSerializer(picture)
+        return Response(serializer.data)
+
+@api_view(['GET'])
+def download_picture(request, filename):
+    if request.method == 'GET':
+        user = request.user
+        username = user.username
+        path = os.path.join( username + '/' , filename)
+        if os.path.exists(path):
+            with open(path, 'rb') as fh:
+                response = HttpResponse(fh.read(), content_type="application/vnd.ms-excel")
+                response['Content-Disposition'] = 'inline; filename=' + os.path.basename(path)
+                return response
+        else:
+            raise Http404
+
+
+
+
+

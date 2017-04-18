@@ -17,6 +17,7 @@ from django.conf.urls import include, url
 from django.contrib import admin
 from django.conf.urls import include
 from file_storage import views
+import private_storage.urls
 
 urlpatterns = [
     url(r'^polls/', include('polls.urls')),
@@ -24,6 +25,7 @@ urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^social_sign_up/$', views.SocialSignUp.as_view(), name="social_sign_up"),
     url(r'^auth/', include('rest_framework_social_oauth2.urls')),
+    url('^private-media/', include(private_storage.urls)),
 ]
 
 #views.SocialSignUp.as_view()
