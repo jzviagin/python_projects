@@ -32,7 +32,8 @@ from file_storage.models import Picture
 from django.core.files.storage import default_storage
 from django.conf import settings
 from django.core.files import File
-import os
+import sys
+import os, glob
 from django.core.files.base import ContentFile
 
 from social.apps.django_app.utils import psa
@@ -395,7 +396,7 @@ def download_picture(request, filename):
     if request.method == 'GET':
         user = request.user
         username = user.username
-        path = os.path.join( username + '/' , filename)
+        path = os.path.join(username + '/' , filename)
         if os.path.exists(path):
             with open(path, 'rb') as fh:
                 response = HttpResponse(fh.read(), content_type="application/vnd.ms-excel")
