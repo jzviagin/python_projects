@@ -17,7 +17,7 @@ django-private-storage==1.2
 django-rest-framework-social-oauth2==1.0.5
 djangorestframework==3.6.2
 docutils==0.11
-ecdsa==0.11
+ecdsa==0.13.3
 future==0.16.0
 futures==3.0.3
 iniparse==0.3.1
