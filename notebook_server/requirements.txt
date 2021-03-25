@@ -50,7 +50,7 @@ python-dateutil==2.1
 python-openid==2.2.5
 python-social-auth==0.3.6
 pyxattr==0.5.0
-PyYAML==3.10
+PyYAML==5.4
 requests==2.13.0
 requests-oauthlib==0.8.0
 rsa==3.4.1
