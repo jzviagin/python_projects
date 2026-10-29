@@ -8,7 +8,6 @@
     .some((m) => matchMedia(`(display-mode: ${m})`).matches);
   if (ONLY_IN_APP_WINDOW && !isAppWindow) return;
 
-  const DEFAULT_TEMPLATE = "שלום {name}, הטכנאי שלנו בדרך אליך לרחוב {street}.";
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const digitsOf = (s) => (s || "").replace(/\D/g, "");
 
@@ -21,6 +20,17 @@
     return null;
   }
 
+  // ---------- config.json ----------
+  let config = { message: "", params: [] };
+  async function loadConfig() {
+    const res = await fetch(chrome.runtime.getURL("config.json"), { cache: "no-store" });
+    const cfg = await res.json();
+    if (typeof cfg.message !== "string" || !Array.isArray(cfg.params)) {
+      throw new Error('config.json needs "message" (text) and "params" (list of names)');
+    }
+    return { message: cfg.message, params: cfg.params.map(String) };
+  }
+
   // ---------- UI ----------
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:16px;bottom:16px;z-index:2147483647;";
@@ -31,31 +41,26 @@
       * { box-sizing: border-box; font: 14px system-ui, sans-serif; }
       .fab { width: 48px; height: 48px; border-radius: 50%; border: 0; cursor: pointer;
              background: #25d366; box-shadow: 0 2px 8px rgba(0,0,0,.3); display: grid; place-items: center; }
-      .panel { display: none; width: 340px; margin-bottom: 10px; padding: 12px; border-radius: 10px;
-               background: #fff; color: #111; box-shadow: 0 4px 20px rgba(0,0,0,.35); }
+      .panel { display: none; width: 340px; max-height: calc(100vh - 90px); overflow-y: auto; margin-bottom: 10px;
+               padding: 12px; border-radius: 10px; background: #fff; color: #111; box-shadow: 0 4px 20px rgba(0,0,0,.35); }
       .open .panel { display: block; }
-      label { display: block; margin: 8px 0 3px; color: #555; font-size: 12px; }
-      input, textarea { width: 100%; padding: 7px 8px; border: 1px solid #ccc; border-radius: 6px; color: #111; background: #fff; }
-      textarea { height: 70px; resize: vertical; }
+      label { display: block; text-align: start; margin: 8px 0 3px; color: #555; font-size: 12px; }
+      input { width: 100%; padding: 7px 8px; border: 1px solid #ccc; border-radius: 6px; color: #111; background: #fff; }
       .num { margin-top: 3px; font-size: 12px; min-height: 16px; }
-      .ok { color: #1a7f37; } .warn { color: #b36b00; }
+      .ok { color: #1a7f37; } .warn { color: #b36b00; } .err { color: #c62828; }
       .preview { margin-top: 10px; padding: 8px; border-radius: 8px; background: #dcf8c6; white-space: pre-wrap; min-height: 34px; }
+      .preview mark { background: #ffe08a; }
       .row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
       button.b { padding: 7px 12px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
       button.primary { background: #25d366; border-color: #1fae55; color: #fff; font-weight: 600; }
-      .status { margin-top: 8px; font-size: 12px; color: #555; min-height: 16px; }
+      .status { margin-top: 8px; font-size: 12px; color: #555; min-height: 16px; white-space: pre-wrap; }
     </style>
     <div class="wrap">
       <div class="panel">
         <label>Phone (paste any format)</label>
         <input id="phone" dir="ltr" autocomplete="off">
         <div class="num" id="num"></div>
-        <label>Customer name</label>
-        <input id="name" dir="auto" autocomplete="off">
-        <label>Street</label>
-        <input id="street" dir="auto" autocomplete="off">
-        <label>Template — use {name} and {street}</label>
-        <textarea id="tpl" dir="auto"></textarea>
+        <div id="fields"></div>
         <div class="preview" id="preview" dir="auto"></div>
         <div class="row">
           <button class="b" id="clear">Clear</button>
@@ -70,17 +75,41 @@
     </div>`;
   const $ = (id) => root.getElementById(id);
   const wrap = root.querySelector(".wrap");
+  const fieldInputs = () => [...$("fields").querySelectorAll("input")];
 
   // Keep WhatsApp's global keyboard shortcuts from stealing our keystrokes.
   for (const ev of ["keydown", "keyup", "keypress", "input", "paste", "copy", "cut"]) {
     wrap.addEventListener(ev, (e) => e.stopPropagation());
   }
 
-  chrome.storage.local.get({ template: DEFAULT_TEMPLATE }, (s) => { $("tpl").value = s.template; refresh(); });
+  // Rebuild the fields from config.json, keeping values already typed.
+  function buildFields() {
+    const old = Object.fromEntries(fieldInputs().map((i) => [i.dataset.param, i.value]));
+    const box = $("fields");
+    box.replaceChildren();
+    for (const name of config.params) {
+      const label = document.createElement("label");
+      label.textContent = name;
+      label.dir = "auto";
+      const input = document.createElement("input");
+      input.dir = "auto";
+      input.autocomplete = "off";
+      input.dataset.param = name;
+      input.value = old[name] || "";
+      input.addEventListener("input", refresh);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+      box.append(label, input);
+    }
+  }
 
-  const message = () => $("tpl").value
-    .replaceAll("{name}", $("name").value.trim())
-    .replaceAll("{street}", $("street").value.trim());
+  const values = () => Object.fromEntries(fieldInputs().map((i) => [i.dataset.param, i.value.trim()]));
+
+  // Replace {param} with its value; unknown or empty {placeholders} are left as-is.
+  function message() {
+    const vals = values();
+    return config.message.replace(/\{([^{}]+)\}/g, (m, name) => vals[name] || m);
+  }
+  const escapeHtml = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
   function refresh() {
     const raw = $("phone").value;
@@ -92,18 +121,43 @@
     } else {
       num.textContent = "";
     }
-    $("preview").textContent = message();
+    // Escape the template text but keep our <mark> tags for empty params.
+    const parts = config.message.split(/(\{[^{}]+\})/);
+    const vals = values();
+    $("preview").innerHTML = parts.map((part) => {
+      const m = part.match(/^\{([^{}]+)\}$/);
+      if (!m || !(m[1] in vals)) return escapeHtml(part);
+      return vals[m[1]] ? escapeHtml(vals[m[1]]) : `<mark>${escapeHtml(part)}</mark>`;
+    }).join("");
   }
-  const status = (t) => { $("status").textContent = t; };
+  const status = (t, cls = "") => { $("status").textContent = t; $("status").className = "status " + cls; };
 
-  for (const id of ["phone", "name", "street", "tpl"]) $(id).addEventListener("input", refresh);
-  $("tpl").addEventListener("change", () => chrome.storage.local.set({ template: $("tpl").value }));
-  $("fab").addEventListener("click", () => {
+  async function reloadConfig() {
+    try {
+      config = await loadConfig();
+      buildFields();
+      const unknown = [...config.message.matchAll(/\{([^{}]+)\}/g)]
+        .map((m) => m[1]).filter((n) => !config.params.includes(n));
+      status(unknown.length ? `⚠ config.json: message uses {${unknown.join("}, {")}} but it's not in "params"` : "",
+             unknown.length ? "warn" : "");
+    } catch (e) {
+      status("Can't read config.json: " + e.message, "err");
+    }
+    refresh();
+  }
+
+  $("phone").addEventListener("input", refresh);
+  $("phone").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  $("fab").addEventListener("click", async () => {
     wrap.classList.toggle("open");
-    if (wrap.classList.contains("open")) $("phone").focus();
+    if (wrap.classList.contains("open")) {
+      await reloadConfig(); // picks up config.json edits each time the panel opens
+      $("phone").focus();
+    }
   });
   $("clear").addEventListener("click", () => {
-    for (const id of ["phone", "name", "street"]) $(id).value = "";
+    $("phone").value = "";
+    for (const i of fieldInputs()) i.value = "";
     status("");
     refresh();
     $("phone").focus();
@@ -112,16 +166,14 @@
     await navigator.clipboard.writeText(message());
     status("Message copied.");
   });
-  for (const id of ["phone", "name", "street"]) {
-    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
-  }
   $("go").addEventListener("click", go);
 
   async function go() {
     const { number, warning } = normalizePhone($("phone").value);
     if (!number) return status("Enter a phone number.");
     if (warning && !confirm(`${number}\n${warning}\n\nOpen anyway?`)) return;
-    chrome.storage.local.set({ template: $("tpl").value });
+    const empty = Object.entries(values()).filter(([, v]) => !v).map(([k]) => k);
+    if (empty.length && !confirm(`Empty: ${empty.join(", ")}\n\nOpen anyway?`)) return;
     const text = message();
     const digits = digitsOf(number);
     $("go").disabled = true;
