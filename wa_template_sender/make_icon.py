@@ -1,4 +1,4 @@
-"""Regenerate assets/icon.{png,icns,ico}. Needs Pillow."""
+"""Regenerate the icons (assets/icon.png and extension/icons/*.png). Needs Pillow."""
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -16,5 +16,7 @@ d.polygon([(500, 540), (700, 330), (530, 610)], fill=(7, 94, 84))
 out = Path(__file__).parent / "assets"
 out.mkdir(exist_ok=True)
 img.save(out / "icon.png")
-img.save(out / "icon.icns")
-img.save(out / "icon.ico", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+icons = Path(__file__).parent / "extension" / "icons"
+icons.mkdir(exist_ok=True)
+for size in (16, 48, 128):
+    img.resize((size, size), Image.LANCZOS).save(icons / f"{size}.png")

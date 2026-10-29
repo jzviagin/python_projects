@@ -1,14 +1,31 @@
 # WA Sender
 
-Small desktop app: paste a phone number (any format), type the customer name and
-street, and it opens WhatsApp Web with the templated message ready to send.
+A Chrome extension that adds a small panel inside your open WhatsApp Web app
+window. Paste a phone number (any format), type the customer name and street,
+and click **Open chat**. The chat opens in the same window and the message is
+typed into the box. **Nothing is sent**: you review it and press Enter yourself.
 
-## How it sends
+## Install (one time)
 
-It opens `https://web.whatsapp.com/send?phone=972...&text=...` in your default
-browser. If WhatsApp Web is logged in to your **business** account there, the chat
-opens with the message filled in, and you press Enter to send. There's no API
-and no token, and your private WhatsApp app isn't involved.
+1. Open `chrome://extensions` in Chrome.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `extension` folder.
+4. Reload your WhatsApp window (Ctrl+R / Cmd+R). A green button appears at the
+   bottom left.
+
+It only runs on `web.whatsapp.com`, and the panel only shows up in the
+installed WhatsApp app window, not in normal tabs. To show it in tabs too, set
+`ONLY_IN_APP_WINDOW = false` at the top of `extension/content.js`.
+
+## How it opens the chat
+
+1. **In place (fast):** it clicks WhatsApp's *New chat*, searches the number,
+   and clicks the result showing that number. No reload, same session.
+2. **Fallback:** if that doesn't work (WhatsApp changed its layout, or the
+   result shows a saved contact's name instead of the number), it reloads
+   **the same window** with WhatsApp's own `send?phone=…&text=…` link. That
+   takes a few seconds but keeps you logged in. WhatsApp fills in the message
+   and still waits for you to send.
 
 ## Phone normalization
 
@@ -16,37 +33,15 @@ Any of these become `+972501234567`:
 `050-123-4567`, `0501234567`, `501234567`, `(050) 123 4567`,
 `+972 50-123-4567`, `+972-050-1234567`, `00972501234567`.
 Landlines work too (`03-1234567` → `+97231234567`). A number with a `+` and a
-different country code is left alone. The app warns you if the length looks wrong.
+different country code is left alone. The panel warns you if the length looks wrong.
 
 ## Template
 
-Edit the template in the app using `{name}` and `{street}`. It's saved to
-`~/.wa_sender.json` when you send.
+Edit it in the panel with `{name}` and `{street}`. It's remembered between uses.
 
-## Install as an app
+## Development
 
-**Mac:** run the script below. It builds `WA Sender.app` with the icon and copies
-it to `/Applications`.
-
-```bash
-./build_mac.sh
-```
-
-You need a Python that includes Tk. The python.org installer has it. With
-Homebrew, run `brew install python-tk` first.
-
-**Windows:** double-click `build_windows.bat`. It installs to
-`%LOCALAPPDATA%\Programs\WA Sender` and adds Start Menu and Desktop shortcuts.
-
-**Run without building:**
-
-```bash
-python3 wa_sender_gui.py
-```
-
-## Other files
-
-- `send_wa.py`: command-line sender for the official WhatsApp Cloud API
-  (needs your number registered with the API). Not used by the app.
-- `make_icon.py`: regenerates `assets/icon.*` (needs Pillow).
-- `test_normalize.py`: tests for phone normalization (`python3 test_normalize.py`).
+- Phone tests: `node extension/phone.test.js`
+- Regenerate icons: `python3 make_icon.py` (needs Pillow)
+- After editing the extension, click the reload arrow on its card in
+  `chrome://extensions`, then reload the WhatsApp window.
